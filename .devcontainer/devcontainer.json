@@ -1,0 +1,24 @@
+{
+	"name": "byos_django devcontainer",
+	"dockerComposeFile": [
+		"../docker-compose.yml",
+		"docker-compose.yml"
+	],
+	"service": "app",
+	"workspaceFolder": "/src",
+	"customizations": {
+		"vscode": {
+			"settings": {},
+			"extensions": [
+				"ms-python.python",
+			]
+		}
+	},
+	"forwardPorts": [
+		8000
+	],
+	"runServices": [
+		"pw"
+	],
+	"postStartCommand": "python manage.py runserver 0.0.0.0:8000"
+}
