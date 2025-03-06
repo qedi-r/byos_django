@@ -72,6 +72,24 @@ class DeviceLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, null=False, blank=False)
 
 
+class Schedule(models.Model):
+    name = models.TextField()
+    updated_at = models.DateTimeField(auto_now_add=True, null=False, blank=False)
+    created_at = models.DateTimeField(auto_now_add=True, null=False, blank=False)
+
+
+class ScheduleEvent(models.Model):
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    plugins = models.TextField()
+    schedule = models.ForeignKey(Schedule, on_delete=models.CASCADE)
+
+
+class ScheduleDeviceMapping(models.Model):
+    device = models.ForeignKey(Device, on_delete=models.CASCADE)
+    schedule = models.ForeignKey(Schedule, on_delete=models.CASCADE)
+
+
 class Screen(models.Model):
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
     html = models.TextField()

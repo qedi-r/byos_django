@@ -3,7 +3,15 @@ import json
 from django.contrib import admin, messages
 from django.utils.safestring import mark_safe
 
-from .models import APIKey, Device, DeviceLog, Screen
+from .models import (
+    APIKey,
+    Device,
+    DeviceLog,
+    Schedule,
+    ScheduleDeviceMapping,
+    ScheduleEvent,
+    Screen,
+)
 
 
 class DeviceAdmin(admin.ModelAdmin):
@@ -27,6 +35,10 @@ class DeviceAdmin(admin.ModelAdmin):
         all_fields = {field.name for field in self.model._meta.fields}
         readonly_fields = all_fields - editable_fields
         return readonly_fields
+
+
+class ScheduleAdmin(admin.ModelAdmin):
+    list_display = ("name",)
 
 
 class DeviceLogAdmin(admin.ModelAdmin):
@@ -103,3 +115,6 @@ admin.site.register(Device, DeviceAdmin)
 admin.site.register(DeviceLog, DeviceLogAdmin)
 admin.site.register(Screen, ScreenAdmin)
 admin.site.register(APIKey, APIKeyAdmin)
+admin.site.register(Schedule, ScheduleAdmin)
+admin.site.register(ScheduleEvent)
+admin.site.register(ScheduleDeviceMapping)
