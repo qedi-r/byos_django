@@ -11,6 +11,9 @@
 			"settings": {},
 			"extensions": [
 				"ms-python.python",
+				"ms-python.black-formatter",
+				"ms-azuretools.vscode-docker",
+				"knowsuchagency.pdm-task-provider"
 			]
 		}
 	},
