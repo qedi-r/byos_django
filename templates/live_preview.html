@@ -23,9 +23,10 @@
             </div>
         </div>
     </div>
-    <div id="horizontal_split" class="hidden">
+    <div id="horizontal_split" class="hidden" style="width: 800px">
         <div class="flex-1 bg-gray-100 p-1">
-            <div id="preview_button_container"><button>test</button></div>
+            <div class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-center"
+                id="preview_button_container"><button id="plugin_regenerate_button">Regenerate</button></div>
         </div>
         <div class="flex-1 bg-gray-100 p-1">
             <div>
@@ -45,11 +46,18 @@
             window.last_render_content = '';
 
             display_container = document.getElementById('container')
+            preview_img_element = document.getElementById('preview_img')
 
             if (window.plugin_name !== "") {
                 document.getElementById("vertical_split").classList.add("hidden");
                 document.getElementById("horizontal_split").classList.remove("hidden");
                 display_container = document.getElementById('preview_button_container')
+                preview_img_element = document.getElementById('preview_img_plugin')
+                document.getElementById('preview_button_container').addEventListener("click", (e) => {
+                    window.send_timeout = setTimeout(() => {
+                        renderTemplate();
+                    }, 300);
+                })
             }
 
             function renderTemplate() {
@@ -94,7 +102,7 @@
                 previewSocket.onmessage = function (e) {
                     const data = JSON.parse(e.data)[0];
                     // update the iframe content
-                    document.getElementById('preview_img').src = data.content;
+                    preview_img_element.src = data.content;
                     // update the render time
                     document.getElementById('render_time').innerText = `Render time: ${data.render_time}s`;
                     setTimeout(renderTemplate, 3000);

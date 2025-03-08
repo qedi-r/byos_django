@@ -1,22 +1,20 @@
 import base64
 import json
-import logging
 import shutil
 import tempfile
 import time
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 from playwright.async_api import async_playwright
-from trmnl.plugin.homeassistant import HomeAssistantPlugin
+from trmnl.plugin.plugin_map import plugin_map
 from wand.image import Image
 
 from byos_django import settings
 
-log = logging.getLogger()
-
 
 class PreviewConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        await self.accept()
         if not self.scope["user"].is_superuser:
             await self.close(reason="Unauthorized")
         self.pw_manager = async_playwright()
@@ -30,10 +28,8 @@ class PreviewConsumer(AsyncWebsocketConsumer):
             )
         self.page = await self.browser.new_page()
         await self.page.set_viewport_size({"width": 800, "height": 480})
-        await self.accept()
 
     async def disconnect(self, close_code):
-        log.error("closign")
         await self.page.close()
         self.page = None
         await self.browser.close()
@@ -42,8 +38,6 @@ class PreviewConsumer(AsyncWebsocketConsumer):
         pass
 
     async def receive(self, text_data=None, bytes_data=None) -> None:
-        log.error("received")
-        log.error(text_data)
         text_data_json = json.loads(text_data)
         html_content = text_data_json.get("html", None)
         plugin_name = text_data_json.get("plugin_name", None)
@@ -51,13 +45,11 @@ class PreviewConsumer(AsyncWebsocketConsumer):
         if html_content:
             text_data = await self.generate(html_content)
         elif plugin_name:
-            plugin_data = HomeAssistantPlugin({}).generate_html()
-            log.error(plugin_data)
+            plugin_data = plugin_map("homeassistant").generate_html()
             text_data = await self.generate(plugin_data)
         await self.send(text_data=json.dumps(text_data))
 
     async def generate(self, html):
-        log.error("gnearting")
         start_time = time.time()
         if not html:
             return {"content": ""}
