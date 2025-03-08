@@ -6,6 +6,9 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 
+from trmnl import plugins
+from trmnl.plugin.homeassistant import HomeAssistantPlugin
+
 from .middleware import require_api_key
 from .models import Device, Screen
 
@@ -254,6 +257,62 @@ def generate_screen(request):
         )
 
 
+def generate_html_for_plugin(plugin_name):
+    if plugin_name == "ha":
+        plugin = HomeAssistantPlugin(config={})
+        return plugin.generate_html()
+
+
+@csrf_exempt
+@require_api_key
+def generate_plugin(request):
+    # get JSON body
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {
+                "status": 400,
+                "message": "Invalid request",
+            },
+            status=400,
+        )
+
+    device = Device.objects.filter(
+        user=request.api_key.user, friendly_id=data["device"].upper()
+    ).first()
+    if not device:
+        return JsonResponse(
+            {
+                "status": 404,
+                "message": "Device not found",
+            },
+            status=404,
+        )
+
+    generated_data = generate_html_for_plugin(data["plugin"].lower())
+    screen = device.screen_set.create(html=generated_data)
+
+    try:
+        screen.generate_screen()
+        return JsonResponse(
+            {
+                "status": 200,
+                "message": "Screenshot created",
+                "image": screen.image_as_base64,
+            },
+            status=200,
+        )
+    except Exception as e:
+        return JsonResponse(
+            {
+                "status": 500,
+                "message": f"Error creating screenshot: {e}",
+            },
+            status=500,
+        )
+
+
 @login_required(login_url="/admin/login/")
 def preview(request):
     return render(
@@ -264,4 +323,13 @@ def preview(request):
                 open("templates/base.html").read().encode()
             ).decode()
         },
+    )
+
+
+@login_required(login_url="/admin/login/")
+def plugin_preview(request):
+    return render(
+        request,
+        "live_preview.html",
+        {"plugin_name": "ha"},
     )
