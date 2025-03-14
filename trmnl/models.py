@@ -1,5 +1,7 @@
 import base64
+import json
 import random
+import os
 import re
 import shutil
 import string
@@ -53,17 +55,51 @@ class Device(models.Model):
 
         super().save(*args, **kwargs)
 
+    def update_last_seen(self):
+        self.last_seen_at = timezone.now()
+        self.refreshes += 1
+        self.save()
+
     def get_screen(self, update_last_seen=False):
         screen = self.screen_set.order_by("-created_at").first()
-        if update_last_seen:
-            self.last_seen_at = timezone.now()
-            self.refreshes += 1
-            self.save()
+        self.update_last_seen() if update_last_seen else None
 
         if screen:
             return screen
 
         return None
+
+    def currently_scheduled_plugins(self):
+        sdm = ScheduleDeviceMapping.objects.filter(device=self).first()
+        if sdm:
+            se = sdm.schedule.scheduleevent_set.filter(
+                start_time__lt=current_time(), end_time__gt=current_time()
+            )
+            try:
+                return se.first().plugins
+            except:
+                return None
+
+    def get_scheduled_screen(self, update_last_seen=False):
+        plugins = self.currently_scheduled_plugins()
+        plugin = None
+        try:
+            plugin = json.loads(plugins)["plugins"][0]
+            self.update_last_seen() if update_last_seen else None
+            return generate_screen_for_plugin(plugin, self)
+        except:
+            return None
+
+
+def generate_screen_for_plugin(plugin_name, device: Device):
+    from trmnl.plugin.plugin_map import plugin_map
+
+    plugin = plugin_map(plugin_name.lower())
+    if plugin:
+        generated_data = plugin.generate_html()
+        return device.screen_set.create(html=generated_data)
+    else:
+        raise Exception(f"unkown plugin {plugin_name}")
 
 
 class DeviceLog(models.Model):

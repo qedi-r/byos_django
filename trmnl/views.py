@@ -1,16 +1,15 @@
 import base64
 import json
+import pprint
+from urllib.request import Request
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 
-from trmnl import plugins
-from trmnl.plugin.homeassistant import HomeAssistantPlugin
-
 from .middleware import require_api_key
-from .models import Device, Screen
+from .models import Device, Screen, ScheduleDeviceMapping, generate_screen_for_plugin
 
 
 def index(request):
@@ -114,8 +113,62 @@ def display(request):
             status=200,
         )
 
+    return build_screen_response(screen, device.refresh_rate, request)
+
+
+def schedule_display(request):
+    # get mac from headers
+    mac = request.headers.get("ID", None)
+    if not mac:
+        return JsonResponse(
+            {
+                "status": 500,
+                "reset_firmware": True,
+                "message": "Device not found",
+            },
+            status=200,
+        )
+    # get device from database
+    device = Device.objects.filter(mac_address=mac).first()
+    if not device:
+        return JsonResponse(
+            {
+                "status": 500,
+                "reset_firmware": True,
+                "message": "Device not found",
+            },
+            status=200,
+        )
+
+    if not device.user:
+        return JsonResponse(
+            {
+                "status": 202,
+                "image_url": "https://usetrmnl.com/images/setup/setup-logo.bmp",
+                "filename": "setup-logo.bmp",
+                "refresh_rate": "30",
+                "reset_firmware": False,
+                "update_firmware": False,
+                "firmware_url": None,
+                "special_function": "none",
+                "message": f"Device {device.friendly_id} added to BYOS! Please log in to attach it to a user to continue.",
+            },
+            status=200,
+        )
+
+    sdm = ScheduleDeviceMapping.objects.filter(device=device).first()
+
+    if not sdm:
+        # fall back to display
+        return display(request)
+
     # get latest screen, or rover if no screen
-    screen = device.get_screen(update_last_seen=True)
+    screen = device.get_scheduled_screen(update_last_seen=True)
+
+    return build_screen_response(screen, device.refresh_rate, request)
+
+
+def build_screen_response(screen: Screen, refresh_rate: int, request: Request):
     if not screen:
         image_url = request.build_absolute_uri("/static/images/rover.bmp")
         filename = "rover.bmp"
@@ -131,7 +184,7 @@ def display(request):
             "status": 0,
             "image_url": image_url,
             "filename": filename,
-            "refresh_rate": f"{device.refresh_rate}",
+            "refresh_rate": f"{refresh_rate}",
             "reset_firmware": False,
             "update_firmware": False,
             "firmware_url": None,
@@ -257,12 +310,6 @@ def generate_screen(request):
         )
 
 
-def generate_html_for_plugin(plugin_name):
-    if plugin_name == "ha":
-        plugin = HomeAssistantPlugin(config={})
-        return plugin.generate_html()
-
-
 @csrf_exempt
 @require_api_key
 def generate_plugin(request):
@@ -290,8 +337,7 @@ def generate_plugin(request):
             status=404,
         )
 
-    generated_data = generate_html_for_plugin(data["plugin"].lower())
-    screen = device.screen_set.create(html=generated_data)
+    screen = generate_screen_for_plugin(data["plugin"], device)
 
     try:
         screen.generate_screen()
@@ -327,9 +373,9 @@ def preview(request):
 
 
 @login_required(login_url="/admin/login/")
-def plugin_preview(request):
+def plugin_preview(request, plugin_name):
     return render(
         request,
         "live_preview.html",
-        {"plugin_name": "ha"},
+        {"plugin_name": plugin_name},
     )

@@ -1,0 +1,9 @@
+#!/bin/bash
+WORKSPACE=`pwd`
+for I in trmnl/plugin/*/; do
+    cd $I
+    if [[ -e Pipfile.lock ]]; then
+        pipenv install --system
+    fi;
+    cd $WORKSPACE
+done
