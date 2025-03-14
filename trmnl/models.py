@@ -10,9 +10,10 @@ import tempfile
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.utils import timezone
 from playwright.sync_api import sync_playwright
 from wand.image import Image
+
+from trmnl.time import current_time
 
 
 class Device(models.Model):
@@ -56,7 +57,7 @@ class Device(models.Model):
         super().save(*args, **kwargs)
 
     def update_last_seen(self):
-        self.last_seen_at = timezone.now()
+        self.last_seen_at = current_time()
         self.refreshes += 1
         self.save()
 
