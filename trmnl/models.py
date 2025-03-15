@@ -1,19 +1,26 @@
 import base64
 import json
+import logging
 import random
-import os
 import re
 import shutil
 import string
 import tempfile
 
+import pytz
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from playwright.sync_api import sync_playwright
 from wand.image import Image
 
-from trmnl.time import current_time
+from trmnl.time import current_time, server_time
+
+log = logging.getLogger(__name__)
+
+
+def timezone_choices():
+    return list(map(lambda tz: (tz, tz), pytz.common_timezones))
 
 
 class Device(models.Model):
@@ -29,6 +36,7 @@ class Device(models.Model):
     last_seen_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     refreshes = models.IntegerField(default=0)
     refresh_rate = models.IntegerField(default=900)
+    timezone = models.CharField(max_length=64, choices=timezone_choices, null=True)
 
     def __str__(self):
         return f"{self.device_name} ({self.friendly_id})"
@@ -57,7 +65,7 @@ class Device(models.Model):
         super().save(*args, **kwargs)
 
     def update_last_seen(self):
-        self.last_seen_at = current_time()
+        self.last_seen_at = server_time()
         self.refreshes += 1
         self.save()
 
@@ -70,37 +78,52 @@ class Device(models.Model):
 
         return None
 
-    def currently_scheduled_plugins(self):
-        sdm = ScheduleDeviceMapping.objects.filter(device=self).first()
-        if sdm:
-            se = sdm.schedule.scheduleevent_set.filter(
-                start_time__lt=current_time(), end_time__gt=current_time()
-            )
-            try:
-                return se.first().plugins
-            except:
-                return None
+    def active_schedule(self):
+        return ScheduleDeviceMapping.objects.filter(device=self).first().schedule
+
+    def _get_next_plugin_for_list(self, plugins):
+        plugins_obj = json.loads(plugins)
+        if len(plugins) > 1:
+            last_plugin = self.get_screen().plugin
+            if last_plugin and last_plugin in plugins_obj:
+                plugin_idx = (plugins_obj.index(last_plugin) + 1) % len(plugins_obj)
+                return plugins_obj[plugin_idx]
+
+        return plugins_obj[0]
+
+    def current_scheduled_screen(self):
+        return self.active_schedule().current(self.timezone)
+
+    def next_scheduled_screen(self):
+        return self.active_schedule().next(self.timezone)
 
     def get_scheduled_screen(self, update_last_seen=False):
-        plugins = self.currently_scheduled_plugins()
-        plugin = None
+        plugins = self.current_schedule().plugins
+        screen = None
         try:
-            plugin = json.loads(plugins)["plugins"][0]
-            self.update_last_seen() if update_last_seen else None
-            return generate_screen_for_plugin(plugin, self)
-        except:
+            plugin = self._get_next_plugin_for_list(plugins)
+            screen = self.generate_screen_for_plugin(plugin)
+        except Exception as e:
+            log.error("Exception: " + str(e))
             return None
+        if update_last_seen:
+            self.update_last_seen()
+        return screen
 
+    def generate_screen_for_plugin(self, plugin_name):
+        from trmnl.plugin.plugin_map import plugin_map
 
-def generate_screen_for_plugin(plugin_name, device: Device):
-    from trmnl.plugin.plugin_map import plugin_map
+        plugin_name = plugin_name.lower()
 
-    plugin = plugin_map(plugin_name.lower())
-    if plugin:
-        generated_data = plugin.generate_html()
-        return device.screen_set.create(html=generated_data)
-    else:
-        raise Exception(f"unkown plugin {plugin_name}")
+        context = {
+            "timezone": self.timezone,
+        }
+        plugin = plugin_map(plugin_name, context)
+        if plugin:
+            generated_data = plugin.generate_html()
+            return self.screen_set.create(html=generated_data, plugin=plugin_name)
+        else:
+            raise Exception(f"unkown plugin {plugin_name}")
 
 
 class DeviceLog(models.Model):
@@ -113,6 +136,27 @@ class Schedule(models.Model):
     name = models.TextField()
     updated_at = models.DateTimeField(auto_now_add=True, null=False, blank=False)
     created_at = models.DateTimeField(auto_now_add=True, null=False, blank=False)
+    refresh_rate = models.IntegerField(default=900)
+
+    def __str__(self):
+        return f"{self.name}"
+
+    def current(self, timezone):
+        local_current_time = current_time(timezone)
+        return self.scheduleevent_set.filter(
+            start_time__lt=local_current_time,
+            end_time__gt=local_current_time,
+        ).first()
+
+    def next(self, timezone):
+        local_current_time = current_time(timezone)
+        return (
+            self.scheduleevent_set.filter(
+                start_time__gt=local_current_time,
+            )
+            .order_by("start_time")
+            .first()
+        )
 
 
 class ScheduleEvent(models.Model):
@@ -133,6 +177,7 @@ class Screen(models.Model):
     screen = models.BinaryField()
     created_at = models.DateTimeField(auto_now_add=True, null=False, blank=False)
     generated = models.BooleanField(default=False)
+    plugin = models.TextField(null=True)
 
     def generate_screen(self):
         # get random file name

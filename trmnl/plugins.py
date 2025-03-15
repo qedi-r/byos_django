@@ -9,6 +9,12 @@ class BasePlugin:
     def generate_html(self):
         raise NotImplementedError
 
+    def config_get(self, key: str):
+        if key in self.config:
+            return self.config[key]
+        else:
+            return None
+
     def __str__(self):
         return f"<Plugin {self.__class__.__name__}>"
 
@@ -25,7 +31,7 @@ class DefaultTemplatePlugin(BasePlugin):
         return f"""<div class="view view--full">{argstr}{titlebar}</div>"""
 
     def titlebar(self, **kwargs):
-        now = current_time()
+        now = current_time(self.config_get("timezone"))
         generation_time = now.strftime("%A %H:%M")
         return f"""<div class="title_bar"><span class="title">{kwargs.get('title', "Plugin")}</span><span class="instance">{generation_time}</span></div>"""
 

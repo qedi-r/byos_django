@@ -1,6 +1,5 @@
 import base64
 import json
-import pprint
 from urllib.request import Request
 
 from django.contrib.auth.decorators import login_required
@@ -8,8 +7,10 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 
+from trmnl.time import seconds_until
+
 from .middleware import require_api_key
-from .models import Device, Screen, ScheduleDeviceMapping, generate_screen_for_plugin
+from .models import Device, ScheduleDeviceMapping, Screen
 
 
 def index(request):
@@ -159,13 +160,22 @@ def schedule_display(request):
     sdm = ScheduleDeviceMapping.objects.filter(device=device).first()
 
     if not sdm:
-        # fall back to display
+        # fall back to last shown display
         return display(request)
 
     # get latest screen, or rover if no screen
     screen = device.get_scheduled_screen(update_last_seen=True)
 
-    return build_screen_response(screen, device.refresh_rate, request)
+    current_scheduled_screen = device.current_scheduled_screen()
+    next_scheduled_screen = device.next_scheduled_screen()
+    next_schedule_in_seconds = seconds_until(
+        next_scheduled_screen.start_time, device.timezone
+    )
+    refresh = current_scheduled_screen.refresh_rate or device.refresh_rate
+    if refresh > next_schedule_in_seconds:
+        refresh = next_schedule_in_seconds
+
+    return build_screen_response(screen, refresh, request)
 
 
 def build_screen_response(screen: Screen, refresh_rate: int, request: Request):
@@ -188,6 +198,7 @@ def build_screen_response(screen: Screen, refresh_rate: int, request: Request):
             "reset_firmware": False,
             "update_firmware": False,
             "firmware_url": None,
+            "plugin": screen.plugin or None,
             "special_function": "none",
         },
         status=200,
@@ -337,7 +348,7 @@ def generate_plugin(request):
             status=404,
         )
 
-    screen = generate_screen_for_plugin(data["plugin"], device)
+    screen = device.generate_screen_for_plugin(data["plugin"])
 
     try:
         screen.generate_screen()

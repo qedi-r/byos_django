@@ -31,7 +31,7 @@ class DeviceAdmin(admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         # Make all fields read-only except device_name and user
-        editable_fields = {"device_name", "user", "refresh_rate"}
+        editable_fields = {"device_name", "user", "refresh_rate", "timezone"}
         all_fields = {field.name for field in self.model._meta.fields}
         readonly_fields = all_fields - editable_fields
         return readonly_fields
@@ -39,6 +39,15 @@ class DeviceAdmin(admin.ModelAdmin):
 
 class ScheduleAdmin(admin.ModelAdmin):
     list_display = ("name",)
+
+
+class ScheduleDeviceMappingAdmin(admin.ModelAdmin):
+    list_display = ("device", "schedule")
+
+
+class ScheduleEventAdmin(admin.ModelAdmin):
+    list_display = ("schedule", "start_time", "end_time")
+    list_filter = ("schedule",)
 
 
 class DeviceLogAdmin(admin.ModelAdmin):
@@ -116,5 +125,5 @@ admin.site.register(DeviceLog, DeviceLogAdmin)
 admin.site.register(Screen, ScreenAdmin)
 admin.site.register(APIKey, APIKeyAdmin)
 admin.site.register(Schedule, ScheduleAdmin)
-admin.site.register(ScheduleEvent)
-admin.site.register(ScheduleDeviceMapping)
+admin.site.register(ScheduleEvent, ScheduleEventAdmin)
+admin.site.register(ScheduleDeviceMapping, ScheduleDeviceMappingAdmin)

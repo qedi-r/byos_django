@@ -1,22 +1,34 @@
-import datetime
+from datetime import datetime, time, timedelta
 import pytz
 
 
-def current_timezone():
-    return datetime.datetime.now().astimezone().tzname()
+def default_timezone():
+    return pytz.timezone(datetime.now().astimezone().tzname())
 
 
-def current_time():
-    return (
-        datetime.datetime.now()
-        .astimezone(pytz.timezone(current_timezone()))
-        .strftime("%H:%M:%S")
-    )
+def current_time(timezone):
+    timezone = default_timezone() if timezone == None else timezone
+    return datetime.now().astimezone(pytz.timezone(timezone)).time()
 
 
-def is_hour(checked_datetime, hour):
+def seconds_until(target_time: time, timezone: str):
+    tz = pytz.timezone(timezone)
+    now = datetime.now().astimezone(tz)
+    target_datetime = datetime.combine(now.date(), target_time, tzinfo=now.tzinfo)
+    if target_datetime < now:
+        return 0
+    difference = target_datetime - now
+    return difference.seconds
+
+
+def server_time():
+    return datetime.now()
+
+
+def is_hour(checked_datetime, hour, tz=None):
     if not checked_datetime:
         return False
+    if tz == None:
+        tz = default_timezone()
 
-    dt = datetime.fromisoformat(checked_datetime).astimezone(current_timezone())
-    return dt.hour == hour
+    return datetime.fromisoformat(checked_datetime).astimezone(tz).hour == hour
