@@ -21,7 +21,8 @@
 		8000
 	],
 	"runServices": [
-		"pw"
+		"pw",
+		"nginx"
 	],
 	"postStartCommand": "python manage.py runserver 0.0.0.0:8000"
 }
