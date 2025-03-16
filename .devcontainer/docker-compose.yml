@@ -1,8 +1,8 @@
 services:
   app:
-    working_dir: /workspace
+    working_dir: /src
     volumes:
-      - .:/workspace:cached
+      - .:/src:cached
     environment:
       - DEBUG=true
     # Overrides default command so things don't shut down after the process ends.
