@@ -6,6 +6,12 @@ class BasePlugin:
     def __init__(self, config):
         self.config = config
 
+    def is_optional():
+        return False
+
+    def should_display():
+        return True
+
     def generate_html(self):
         raise NotImplementedError
 

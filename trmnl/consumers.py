@@ -45,7 +45,7 @@ class PreviewConsumer(AsyncWebsocketConsumer):
         if html_content:
             text_data = await self.generate(html_content)
         elif plugin_name:
-            plugin_data = plugin_map("homeassistant").generate_html()
+            plugin_data = plugin_map(plugin_name).generate_html()
             text_data = await self.generate(plugin_data)
         await self.send(text_data=json.dumps(text_data))
 

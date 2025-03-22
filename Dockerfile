@@ -13,6 +13,8 @@ COPY etc/nginx.conf /etc/nginx/sites-available/default
 
 COPY . .
 
+RUN bash ./plugin_install
+
 RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000

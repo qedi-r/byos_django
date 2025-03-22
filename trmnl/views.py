@@ -7,7 +7,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 
-from trmnl.time import seconds_until
+from trmnl.time import seconds_until_next_time
 
 from .middleware import require_api_key
 from .models import Device, ScheduleDeviceMapping, Screen
@@ -168,7 +168,7 @@ def schedule_display(request):
 
     current_scheduled_screen = device.current_scheduled_screen()
     next_scheduled_screen = device.next_scheduled_screen()
-    next_schedule_in_seconds = seconds_until(
+    next_schedule_in_seconds = seconds_until_next_time(
         next_scheduled_screen.start_time, device.timezone
     )
     refresh = current_scheduled_screen.refresh_rate or device.refresh_rate
